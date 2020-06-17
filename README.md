@@ -3,6 +3,7 @@ sistec: Tools to Analyze Sistec Datasets
 
 [![Travis build
 status](https://travis-ci.org/r-ifpe/sistec.svg?branch=master)](https://travis-ci.org/r-ifpe/sistec)
+[![CRAN\_Status\_Badge](https://www.r-pkg.org/badges/version/sistec)](https://cran.r-project.org/package=sistec)
 
 The [Sistec](https://sistec.mec.gov.br/) is the Brazilian system for
 diploma registration and validation on technical and superior courses.
@@ -12,12 +13,25 @@ retention and drop out.
 
 ## Installation
 
+You can install the sistec package from
+[CRAN](https://CRAN.r-project.org) as follows:
+
+``` r
+install.packages("sistec")
+```
+
 To upgrade to the latest version of sistec, run the following command
 and restart your r session:
 
 ``` r
 install.packages("devtools")
 devtools::install_github("r-ifpe/sistec")
+```
+
+Load the package.
+
+``` r
+library(sistec)
 ```
 
 ## Sistec datasets
@@ -41,9 +55,8 @@ by student name and use " ".
 
 ## Qacademico datasets
 
-By now, the sistec package only supports student’s comparison between
-Sistec and Qacademico. To download the student’s data, go to your proper
-account on Qacademico and follow
+To download the student’s data, go to your proper account on Qacademico
+and follow:
 
   - “Relatorio de Alunos” –\> “Listagem de Alunos” (choose year and
     period)
@@ -52,27 +65,40 @@ account on Qacademico and follow
   - Rename the including year and period (example2020\_1.csv)
 
 Be sure that your data has the variables: “Matricula”, “Nome”, “Situacao
-Matricula”, “Curso”, “Cpf”, “Instituicao”, “Per. Letivo Inicial”.
+Matricula”, “Curso”, “Cpf”, “Instituicao”, “Per. Letivo Inicial” and
+“Cota”.
+
+## Sigaa datasets
+
+To download the student’s data, go to your proper account on Sigaa and
+follow:
+
+  - Access the panel “Consultas” inside Sigaa module.
+  - Generate the report “Consulta geral discentes”.
+  - Select the check box “Trazer informações em forma de relatório” e
+    “Gerar csv”.
+  - Select the filter “Campus” and other filter you desire.
+  - Selecionar o filtro “campus” ou outros filtros desejados.
+  - Click on “Buscar” and download the file.
+
+Be sure that your data has the variables: “Matricula”, “Nome”,
+“Status,”Curso" and “CPF”.
 
 ## Read files
 
-Load the sistec package and pass the folder path to `read_*()`functions.
-(**NOTE**: These datasets were generated randomly and do not represent
-the reality, it is just for example purpose).
+Load the sistec package and pass the folder path to `read_*()`
+functions. (**NOTE**: These datasets were generated randomly and do not
+represent the reality, it is just for example
+purpose).
 
 ``` r
-library(sistec)
-
-sistec <- read_sistec(system.file("extdata/examples/sistec",
-                                  package = "sistec"))
-
-qacademico <- read_qacademico(system.file("extdata/examples/qacademico",
-                                          package = "sistec"))
+sistec <- read_sistec(system.file("extdata/examples/sistec", package = "sistec"))
+qacademico <- read_rfept(system.file("extdata/examples/qacademico", package = "sistec"))
 ```
 
 ## Comparison
 
-Compare the student’s situation using `sistec::compare_sistec()`
+Compare the student’s situation using `compare_sistec()`
 
 ``` r
 comparison <- compare_sistec(sistec, qacademico)
@@ -80,8 +106,7 @@ comparison <- compare_sistec(sistec, qacademico)
 
 ## Save results
 
-You can save the comparison in .xlsx format using
-`sistec::write_output()`
+You can save the comparison in .xlsx format using `write_output()`
 
 ``` r
 write_output(output_path = "your_folder",
@@ -89,9 +114,10 @@ write_output(output_path = "your_folder",
              comparison = comparison)
 ```
 
-## Web interface
+## ARIA web interface
 
-You also can use all those tools using the web interface, run
-`sistec::sistec_app()`.
+ARIA is the web interface created in this package to ease your work. You
+can use all those functions just clicking in a few buttons, run
+`aria()`.
 
-<img src="tools/readme/sistec_app.png" class="screenshot" width=800 />
+<img src="tools/readme/aria_0.1.0.png" class="screenshot" width=800 />

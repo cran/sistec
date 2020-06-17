@@ -4,10 +4,14 @@
 \alias{read_qacademico}
 \title{Read Qacademico files}
 \usage{
-read_qacademico(path = "")
+read_qacademico(path = "", start = NULL)
 }
 \arguments{
 \item{path}{The Qacademico file's path.}
+
+\item{start}{A character with the date to start the comparison. The default is the minimum
+value found in the data. The date has to be in this format: "yyyy.semester".
+Ex.: "2019.1" or "2019.2".}
 }
 \value{
 A data frame.
@@ -27,7 +31,7 @@ follow:
 }
 
 Be sure that your data has the variables: "Matricula", "Nome", "Situacao Matricula",
-"Curso", "Cpf", "Instituicao", "Per. Letivo Inicial".
+"Curso", "Cpf", "Instituicao", "Per. Letivo Inicial" and "Cota".
 }
 \examples{
  
