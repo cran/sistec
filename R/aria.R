@@ -14,63 +14,47 @@
 #' @param test_mode Use FALSE in production and TRUE when you are testing. In production,
 #' when you close the browser ,the app and the R session will be closed. In test, only the app will 
 #' close when you close the browser.
+#' @param version A string. Choose "offline" or "online" version.
 #' 
 #' @return A web application.
 #'
-#' @import shiny
+#' @import shiny 
 #' @export
 aria <- function(output_path = NULL,
                  output_folder_name = "ARIA",
                  max_file_size = 100,
                  options_port = 8888,
                  options_launch_browser = TRUE,
-                 test_mode = TRUE){
+                 test_mode = TRUE,
+                 version = "offline"){
 
   shiny_max_file_size <- as.integer(max_file_size*1024^2)
   opt <- options(shiny.maxRequestSize = shiny_max_file_size) 
   on.exit(options(opt))
-  
-  description_path <- system.file("DESCRIPTION", package = "sistec")
-  version <- as.character(read.dcf(description_path, fields = "Version"))
-  
+
   period_input <- read_period_input()
   
   ui <- fluidPage(
-    navbarPage(paste0("ARIA v", version),
+    navbarPage(paste0("ARIA v", aria_version()),
                tabPanel("SISTEC",
                         sidebarLayout(
                           sidebarPanel(
-                            fileInput("rfept", "Escolha os arquivos do registro acad\u00eamico",
-                                      multiple = TRUE,
-                                      buttonLabel = "Arquivos",
-                                      placeholder = "Nada Selecionado",
-                                      accept = c("text/csv",
-                                                 "text/comma-separated-values,text/plain",
-                                                 ".csv")),
-                            fileInput("sistec", "Escolha os arquivos do Sistec",
-                                      multiple = TRUE,
-                                      buttonLabel = "Arquivos",
-                                      placeholder = "Nada Selecionado",
-                                      accept = c("text/csv",
-                                                 "text/comma-separated-values,text/plain",
-                                                 ".csv")),
-                            selectInput("year", "Comparar a partir de:",
-                                        choices = period_input$PERIOD,
-                                        selected = "2019.1"),
-                            actionButton("do", "Comparar"),
-                            actionButton("download", "Salvar resultados"),
-                            if(test_mode) checkboxInput("test_mode", "Test mode", TRUE)
+                            tags$head(tags$style(aria_head_tags())),
+                            aria_input_rfept(),
+                            aria_input_sistec(),
+                            aria_input_years(period_input$PERIOD),
+                            br(),
+                            aria_input_compare_button(),
+                            aria_input_download_button(),
+                            aria_test_mode_checkbox(test_mode)
                           ),
-                          mainPanel(
-                            strong(htmlOutput("contents")),
-                            br(), br(), br(), br(),
-                            strong(htmlOutput("download"))
-                          )
+                         aria_main_panel(version)
                         )
-               )
+               ),
+               tabPanel("MANUAL", manual_screen())
     )
   )
-  
+ 
   server <- function(input, output, session){
     # close the R session when Chrome closes
     session$onSessionEnded(function() {
@@ -78,15 +62,44 @@ aria <- function(output_path = NULL,
         stopApp()
         q("no")
       } else {
-        stopApp()
+      #  stopApp()
       }
     })
-    
+
     comparison <- reactiveValues(x = FALSE)
     
-    output$download <- renderText({
-      input$download
-      
+    output$download_online <- downloadHandler(
+      filename = "ARIA.zip",
+      content = function(file){
+        #go to a temp dir to avoid permission issues
+        output_path <- tempdir()
+        owd <- setwd(output_path)
+        on.exit(setwd(owd))
+        files <- NULL;
+        
+        if(is.list(isolate(comparison$x))){
+          
+          output_path <- shiny_output_path(output_path)
+          
+          write_output(x = isolate(comparison$x),
+                       output_path = output_path,
+                       output_folder_name = output_folder_name)
+          
+          "Download realizado com sucesso!"
+          
+        } else {
+          ""
+        }
+        #create the zip file
+        utils::zip(file, "ARIA/")
+      }
+    )
+    
+    output$download_offline <- renderText({
+
+      if(is.null(input$download_offline)) return()
+      if(input$download_offline == 0) return()
+
       if(is.list(isolate(comparison$x))){
         
         output_path <- shiny_output_path(output_path)
@@ -96,30 +109,50 @@ aria <- function(output_path = NULL,
                      output_folder_name = output_folder_name)
         
         "Download realizado com sucesso!"
-        
       } else {
         "" 
       }
     })
     
     output$contents <- renderText({
-      input$do
-      
-      comparison$x <- isolate(
-        if(!is.null(input$sistec$datapath[1]) && !is.null(input$rfept$datapath[1])){
-          shiny_comparison(input$sistec$datapath[1],
-                           input$rfept$datapath[1],
-                           input$year)
-        } else {FALSE}
-      ) 
+
+      if(is.null(input$do)){
+        comparison$x <- FALSE
+      } else if(isolate(input$do == 0)){
+        comparison$x <- FALSE
+      } else {
+        comparison$x <- isolate(
+            shiny_comparison(input$sistec$datapath[1],
+                             input$rfept$datapath[1], 
+                             input$year)
+        ) 
+      }
       
       isolate(output_screen(input$sistec$datapath[1],
-                            input$rfept$datapath[1],
+                            input$rfept$datapath[1], 
                             comparison$x)
       )
     })
+    
+    output$compare_button <- renderUI({
+      if(all(!is.null(input$sistec$datapath[1]),
+             !is.null(input$rfept$datapath[1]))){
+          
+        aria_compare_button()
+      }
+    })
+    
+    output$download_button <- renderUI({
+
+      if(!is.null(input$do)){
+        if(input$do != 0){
+          aria_download_button(version)
+        }
+      } 
+    })
+    
+    
   }
   
-  shinyApp(ui, server, options = list(port = options_port,
-                                      launch.browser = options_launch_browser))
+  aria_run(ui, server, version, options_port, options_launch_browser)
 } 

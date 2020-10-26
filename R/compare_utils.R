@@ -1,19 +1,30 @@
-create_sistec_rfept_list <- function(sistec, rfept){
+create_sistec_rfept_list <- function(sistec, rfept, linked_courses = NULL){
   
+  if(is.null(linked_courses)){
+    linked_courses <- data.frame()
+  } 
+
   list(sistec = sistec,
        sistec_complete = sistec,
        sistec_without_cpf = data.frame(),
        sistec_without_rfept = data.frame(),
+       sistec_wrong_cpf = data.frame(),
+       sistec_duplicated_registry = data.frame(),
+       sistec_unlinked_entry = data.frame(),
+       sistec_pending = data.frame(),
        rfept = rfept,
        rfept_complete = rfept,
        rfept_without_cpf = data.frame(),
        rfept_without_sistec = data.frame(),
-       rfept_wrong_beginning = data.frame(),
-       rfept_wrong_cyclo = data.frame(),
+       rfept_wrong_cpf = data.frame(),
+       rfept_duplicated_registry = data.frame(),
+       rfept_unlinked_entry = data.frame(),
+       rfept_pending = data.frame(),
+       wrong_beginning = data.frame(),
        situation_updated = data.frame(),
        situation_to_update = data.frame(),
        sistec_rfept_linked = data.frame(),
-       linked_courses = data.frame())
+       linked_courses = linked_courses)
 }
 
 #' @importFrom dplyr sym
@@ -30,15 +41,71 @@ remove_invalid_cpf <- function(x){
   x
 }
 
-#' @importFrom dplyr %>% 
-remove_unliked_cpf <- function(x){
+#' @importFrom dplyr %>% sym
+remove_duplicated_registry <- function(x){
+  sistec_duplicated_registry <- x$sistec %>% 
+    dplyr::group_by(!!sym("S_NU_CPF"), !!sym("S_NO_CURSO"), !!sym("S_DT_INICIO_CURSO")) %>% 
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1)
+  
+  x$sistec_duplicated_registry <- x$sistec %>% 
+    dplyr::semi_join(sistec_duplicated_registry, by = c("S_NU_CPF", "S_NO_CURSO", "S_DT_INICIO_CURSO"))
+  
+  x$sistec <- x$sistec %>% 
+    dplyr::anti_join(x$sistec_duplicated_registry, by = c("S_NU_CPF", "S_NO_CURSO", "S_DT_INICIO_CURSO"))
+  
+  rfept_duplicated_registry <- x$rfept %>% 
+    dplyr::group_by(!!sym("R_NU_CPF"), !!sym("R_NO_CURSO"), !!sym("R_DT_INICIO_CURSO")) %>% 
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1)
+  
+  x$rfept_duplicated_registry <- x$rfept %>% 
+    dplyr::semi_join(rfept_duplicated_registry, by = c("R_NU_CPF", "R_NO_CURSO", "R_DT_INICIO_CURSO"))
+  
+  x$rfept <- x$rfept %>% 
+    dplyr::anti_join(x$rfept_duplicated_registry, by = c("R_NU_CPF", "R_NO_CURSO", "R_DT_INICIO_CURSO"))
+  
+  x
+}
+
+#' @importFrom dplyr %>% sym
+remove_wrong_cpf <- function(x){
+  
+  sistec_wrong_cpf <- x$sistec %>%
+    dplyr::mutate(S_NO_ALUNO = stringr::str_trim(!!sym("S_NO_ALUNO"), side = "both")) %>%
+    dplyr::distinct(!!sym("S_NO_ALUNO"), !!sym("S_NU_CPF")) %>%
+    dplyr::group_by(!!sym("S_NU_CPF")) %>%
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1)
+  
+  x$sistec_wrong_cpf <- x$sistec %>% 
+    dplyr::semi_join(sistec_wrong_cpf, by = "S_NU_CPF")
+  
+  x$sistec <- x$sistec %>% 
+    dplyr::anti_join(x$sistec_wrong_cpf, by = "S_NU_CPF")
+
+  rfept_wrong_cpf <- x$rfept %>%
+    dplyr::mutate(R_NO_ALUNO = stringr::str_trim(!!sym("R_NO_ALUNO"), side = "both")) %>%
+    dplyr::distinct(!!sym("R_NO_ALUNO"), !!sym("R_NU_CPF")) %>%
+    dplyr::group_by(!!sym("R_NU_CPF")) %>%
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1)
+  
+  x$rfept_wrong_cpf <- x$rfept %>% 
+    dplyr::semi_join(rfept_wrong_cpf, by = "R_NU_CPF")
+  
+  x$rfept <- x$rfept %>% 
+    dplyr::anti_join(x$rfept_wrong_cpf, by = "R_NU_CPF")
+  
+  x
+}
+
+remove_unlinked_cpf <- function(x){
   x$rfept_without_sistec <- dplyr::anti_join(x$rfept, x$sistec,
-                                             by = c("R_NU_CPF" = "S_NU_CPF")) %>% 
-    dplyr::bind_rows(x$rfept_without_sistec)
+                                             by = c("R_NU_CPF" = "S_NU_CPF"))
   
   x$sistec_without_rfept <- dplyr::anti_join(x$sistec, x$rfept,
-                                             by = c("S_NU_CPF" = "R_NU_CPF")) %>% 
-    dplyr::bind_rows(x$sistec_without_rfept)
+                                             by = c("S_NU_CPF" = "R_NU_CPF")) 
   
   x$rfept <- dplyr::anti_join(x$rfept, x$rfept_without_sistec, by = "R_NU_CPF")
   x$sistec <- dplyr::anti_join(x$sistec, x$sistec_without_rfept, by = "S_NU_CPF")
@@ -46,54 +113,70 @@ remove_unliked_cpf <- function(x){
   x
 }
 
-#' @importFrom dplyr %>% 
-update_unlinked_students <- function(x){
-  x$sistec <- dplyr::anti_join(x$sistec, x$sistec_rfept_linked,
-                               by = c("S_NU_CPF", "S_NO_CURSO"))
-  
-  x$rfept <- dplyr::anti_join(x$rfept, x$sistec_rfept_linked, 
-                              by = c("R_NU_CPF" = "S_NU_CPF", "R_NO_CURSO"))
-  
-  x <- remove_unliked_cpf(x)
-  x
-}
-
 #' @importFrom dplyr %>% sym
-separate_wrong_registration <- function(x){
+separate_wrong_beginning <- function(x){
 
   y <- dplyr::inner_join(x$rfept, x$sistec, by = c("R_NU_CPF" = "S_NU_CPF"))
   y <- y %>% 
     dplyr::group_by(!!sym("R_NO_CURSO"), !!sym("S_NO_CURSO")) %>% 
     dplyr::tally() %>% 
-    dplyr::filter(!!sym("n") >= 10) %>% 
+    dplyr::filter(!!sym("n") >= 8) %>% 
     dplyr::rename(S_NO_CURSO_LINKED = !!sym("S_NO_CURSO"), S_QT_ALUNOS_LINKED = !!sym("n")) %>% 
     dplyr::inner_join(y, by = "R_NO_CURSO") %>% 
     dplyr::filter(!!sym("S_NO_CURSO_LINKED") == !!sym("S_NO_CURSO")) %>% 
+    dplyr::filter(!!sym("S_DT_INICIO_CURSO") != !!sym("R_DT_INICIO_CURSO")) %>% 
     dplyr::ungroup() 
 
-  # update *_without_*
-  x$sistec <- dplyr::anti_join(x$sistec, y, by = c("S_NU_CPF" = "R_NU_CPF", "S_NO_CURSO"))
-  x$rfept <- dplyr::anti_join(x$rfept, y, by = c("R_NU_CPF", "R_NO_CURSO"))
+  # remove students with more than on entry
+  duplicated_students <- y %>%
+    dplyr::group_by(!!sym("R_CO_MATRICULA"), !!sym("R_NU_CPF")) %>% 
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1) 
   
-  x$sistec_without_rfept <-  x$sistec %>% 
-    dplyr::bind_rows(x$sistec_without_rfept)
+  y <- y %>% 
+    dplyr::anti_join(duplicated_students, by = "R_NU_CPF")
   
-  x$rfept_without_sistec <-  x$rfept %>% 
-    dplyr::bind_rows(x$rfept_without_sistec)
+  duplicated_students <- y %>%
+    dplyr::group_by(!!sym("S_CO_CICLO_MATRICULA"), !!sym("R_NU_CPF")) %>% 
+    dplyr::tally() %>% 
+    dplyr::filter(!!sym("n") > 1) 
+  
+  y <- y %>% 
+    dplyr::anti_join(duplicated_students, by = "R_NU_CPF")
   
   # update wrong registration
-  x$rfept_wrong_beginning <- y %>%
-    dplyr::filter(!!sym("S_DT_INICIO_CURSO") != !!sym("R_DT_INICIO_CURSO"))
+  x$sistec <- dplyr::anti_join(x$sistec, y, by = c("S_NU_CPF" = "R_NU_CPF", "S_CO_CICLO_MATRICULA"))
+  x$rfept <- dplyr::anti_join(x$rfept, y, by = c("R_NU_CPF", "R_NO_CURSO"))
   
-  class(x$rfept_wrong_beginning) <- c("wrong_registration_data_frame", class(x$rfept_complete)[-1])
-  
-  x$rfept_wrong_cyclo <- y %>% 
-    dplyr::filter(!!sym("S_DT_INICIO_CURSO") == !!sym("R_DT_INICIO_CURSO"))
-  
-  class(x$rfept_wrong_cyclo) <- c("wrong_registration_data_frame", class(x$rfept_complete)[-1])
+  x$wrong_beginning <- y 
+
+  class(x$wrong_beginning) <- c("wrong_registration_data_frame", class(x$rfept_complete)[-1])
   
   x
 }
+
+separate_unlinked_entry <- function(x){
+  
+  x$rfept_unlinked_entry<- dplyr::anti_join(x$rfept, x$sistec,
+                                            by = c("R_NU_CPF" = "S_NU_CPF")) 
+  
+  x$sistec_unlinked_entry <- dplyr::anti_join(x$sistec, x$rfept,
+                                             by = c("S_NU_CPF" = "R_NU_CPF"))
+  
+  x$rfept <- dplyr::anti_join(x$rfept, x$rfept_unlinked_entry, by = "R_NU_CPF")
+  x$sistec <- dplyr::anti_join(x$sistec, x$sistec_unlinked_entry, by = "S_NU_CPF")
+  
+  x
+}
+
+#' @importFrom dplyr %>% sym
+pending_manual_inspection <- function(x){
+  
+ x$sistec_pending <- x$sistec
+ x$rfept_pending <- x$rfept
+ x
+} 
+
 
 #' @importFrom dplyr %>% syms
 create_linked_courses_data_frame <- function(x){
@@ -105,7 +188,7 @@ create_linked_courses_data_frame <- function(x){
   x$linked_courses <- x$sistec_rfept_linked %>% 
     dplyr::select(!!!syms(select_vars)) %>% 
     dplyr::distinct() %>% 
-    dplyr::arrange(!!!syms(arrange_vars))
+    dplyr::arrange(!!!syms(arrange_vars)) 
   
   class(x$linked_courses) <- c("linked_courses_data_frame", class(x$rfept_complete)[-1])
   
@@ -133,6 +216,55 @@ clean_memory <- function(x){
   # the datasets were merged
   x$sistec <- NULL # clean memory
   x$rfept <-NULL # clean memory
+  
+  x
+}
+
+merge_duplicated_registry <- function(x){
+  
+  students_found <- x$sistec_duplicated_registry %>% # ver o campus
+    dplyr::inner_join(x$linked_courses,
+                      by = c("S_NO_CURSO" = "S_NO_CURSO_LINKED",
+                             "S_DT_INICIO_CURSO" = "R_DT_INICIO_CURSO",
+                             "S_CO_CICLO_MATRICULA")) %>% 
+    dplyr::inner_join(x$rfept, 
+                      by = c("S_NU_CPF" = "R_NU_CPF",
+                             "S_DT_INICIO_CURSO" = "R_DT_INICIO_CURSO",
+                             "R_NO_CURSO"))
+  
+  students_found_linked <- students_found %>% 
+    dplyr::group_by(!!sym("S_NO_CURSO"), !!sym("S_DT_INICIO_CURSO")) %>% 
+    dplyr::tally()
+  
+  x$sistec_rfept_linked <- x$sistec_rfept_linked %>% 
+    dplyr::group_by(!!sym("S_NO_CURSO"), !!sym("S_DT_INICIO_CURSO")) %>% 
+    dplyr::tally() %>% 
+    dplyr::inner_join(students_found_linked,
+                      by = c("S_NO_CURSO", "S_DT_INICIO_CURSO")) %>% 
+    dplyr::mutate(S_QT_ALUNOS_LINKED = !!sym("n.x") + !!sym("n.y")) %>% 
+    dplyr::inner_join(students_found_linked,
+                      by = c("S_NO_CURSO", "S_DT_INICIO_CURSO")) %>% 
+    dplyr::select(!!sym("S_NO_CURSO"), !!sym("S_DT_INICIO_CURSO"),
+                  !!sym("S_QT_ALUNOS_LINKED")) %>% 
+    dplyr::inner_join(students_found, 
+                      by = c("S_NO_CURSO", "S_DT_INICIO_CURSO")) %>% 
+    dplyr::transmute(!!sym("R_NO_CURSO"), S_NO_CURSO_LINKED = !!sym("S_NO_CURSO"), 
+                     !!sym("S_QT_ALUNOS_LINKED"), !!sym("S_NO_ALUNO"),
+                     !!sym("S_NU_CPF"), !!sym("S_CO_CICLO_MATRICULA"), 
+                     !!sym("S_NO_STATUS_MATRICULA"), !!sym("S_NO_CURSO"), 
+                     !!sym("S_DT_INICIO_CURSO"), !!sym("S_NO_CAMPUS"), 
+                     !!sym("R_NO_ALUNO"), !!sym("R_CO_MATRICULA"), 
+                     !!sym("R_CO_CICLO_MATRICULA"), !!sym("R_NO_STATUS_MATRICULA"),
+                     R_DT_INICIO_CURSO = !!sym("S_DT_INICIO_CURSO"),
+                     R_NO_CAMPUS = !!sym("R_NO_CAMPUS.x"), !!sym("R_NO_COTA")) %>% 
+    dplyr::bind_rows(x$sistec_rfept_linked) %>% 
+    dplyr::ungroup()
+  
+  x$sistec_duplicated_registry <- x$sistec_duplicated_registry %>% 
+    dplyr::anti_join(students_found, by = c("S_NU_CPF", "S_CO_CICLO_MATRICULA" ))
+  
+  x$rfept <- x$rfept %>% 
+    dplyr::anti_join(students_found, by = c("R_CO_MATRICULA"))
   
   x
 }

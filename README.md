@@ -4,6 +4,9 @@ sistec: Tools to Analyze Sistec Datasets
 [![Travis build
 status](https://travis-ci.org/r-ifpe/sistec.svg?branch=master)](https://travis-ci.org/r-ifpe/sistec)
 [![CRAN\_Status\_Badge](https://www.r-pkg.org/badges/version/sistec)](https://cran.r-project.org/package=sistec)
+[![CircleCI build
+status](https://circleci.com/gh/r-ifpe/sistec.svg?style=svg)](https://circleci.com/gh/r-ifpe/sistec)
+[<img src="tools/readme/brasil_icon.png" width=22 height=22>](https://github.com/r-ifpe/sistec/blob/master/LEIAME.md)
 
 The [Sistec](https://sistec.mec.gov.br/) is the Brazilian system for
 diploma registration and validation on technical and superior courses.
@@ -21,7 +24,7 @@ install.packages("sistec")
 ```
 
 To upgrade to the latest version of sistec, run the following command
-and restart your r session:
+and restart your R session:
 
 ``` r
 install.packages("devtools")
@@ -70,25 +73,30 @@ Matricula”, “Curso”, “Cpf”, “Instituicao”, “Per. Letivo Inicial�
 
 ## Sigaa datasets
 
-To download the student’s data, go to your proper account on Sigaa and
-follow:
+Sigaa datasets can be partial or complete. These two formats can perform
+the comparison, but the partial doesn’t have information about “Campus”
+and “Cota”.
+
+To download the partial Sigaa’s data, go to your proper account on Sigaa
+and follow:
 
   - Access the panel “Consultas” inside Sigaa module.
   - Generate the report “Consulta geral discentes”.
   - Select the check box “Trazer informações em forma de relatório” e
     “Gerar csv”.
   - Select the filter “Campus” and other filter you desire.
-  - Selecionar o filtro “campus” ou outros filtros desejados.
   - Click on “Buscar” and download the file.
 
-Be sure that your data has the variables: “Matricula”, “Nome”,
-“Status,”Curso" and “CPF”.
+For the complete dataset, you have to download directly from the Sigaa
+database. Be sure that your data has the variables: “Matricula”, “Nome”,
+“Situacao Matricula”, “Curso”, “Cpf”, “Instituicao”, “ano\_ingresso”,
+“semestre\_ingresso” and “Cota”.
 
 ## Read files
 
-Load the sistec package and pass the folder path to `read_*()`
-functions. (**NOTE**: These datasets were generated randomly and do not
-represent the reality, it is just for example
+Load the sistec package and pass the folder path to `read_sistec()` and
+`read_rfept()` functions. (**NOTE**: These datasets were generated
+randomly and do not represent the reality, it is just for example
 purpose).
 
 ``` r
@@ -117,7 +125,9 @@ write_output(output_path = "your_folder",
 ## ARIA web interface
 
 ARIA is the web interface created in this package to ease your work. You
-can use all those functions just clicking in a few buttons, run
-`aria()`.
+can use all those functions just clicking in a few buttons. The ARIA is
+available on version
+[desktop](https://www.dropbox.com/sh/2bv2h49i8qfbzs9/AAA7MBfaZepyLMc5saDAEEo1a?dl=0),
+[online](https://aria.ifpe.edu.br) or run `aria()` in your R session.
 
-<img src="tools/readme/aria_0.1.0.png" class="screenshot" width=800 />
+<img src="tools/readme/aria_0.2.0.png" class="screenshot" width=800 />
